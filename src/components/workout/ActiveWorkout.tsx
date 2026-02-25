@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { workoutPlans } from '@/lib/workoutData';
 import { LoggedExercise, WorkoutSession } from '@/lib/types';
 import { saveSession, getProfile } from '@/lib/storage';
@@ -19,6 +19,51 @@ export default function ActiveWorkout({ onComplete }: ActiveWorkoutProps) {
   const [showTimer, setShowTimer] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(90);
   const [startTime] = useState(Date.now());
+  const wakeLockRef = useRef<WakeLockSentinel | null>(null);
+
+  // Keep screen awake during workout
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      if (selectedPlan && 'wakeLock' in navigator) {
+        try {
+          wakeLockRef.current = await navigator.wakeLock.request('screen');
+        } catch (err) {
+          console.log('Wake lock failed:', err);
+        }
+      }
+    };
+
+    const releaseWakeLock = async () => {
+      if (wakeLockRef.current) {
+        try {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+        } catch (err) {
+          console.log('Wake lock release failed:', err);
+        }
+      }
+    };
+
+    if (selectedPlan) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    // Re-acquire wake lock when page becomes visible again
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && selectedPlan) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      releaseWakeLock();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [selectedPlan]);
 
   const plan = selectedPlan ? workoutPlans.find(p => p.type === selectedPlan) : null;
 

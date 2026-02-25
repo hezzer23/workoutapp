@@ -1,12 +1,17 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { getSessions, getExerciseProgress } from '@/lib/storage';
 import { WorkoutSession } from '@/lib/types';
 
 export default function ProgressView() {
-  const [sessions] = useState<WorkoutSession[]>(() => getSessions());
+  const [sessions, setSessions] = useState<WorkoutSession[]>([]);
   const [selectedExercise, setSelectedExercise] = useState<string>('');
+
+  // Reload sessions every time this tab is viewed
+  useEffect(() => {
+    setSessions(getSessions());
+  }, []);
 
   const stats = useMemo(() => {
     const completedSessions = sessions.filter(s => s.completed);
